@@ -7,7 +7,7 @@ import csv
 import pandas as pd
 
 class Projector:
-    def __init__(self, display_number=0, square_size=40, delay_ms=200):
+    def __init__(self, display_number=1, square_size=40, delay_ms=200):
         self.delay = delay_ms / 1000
 
         # Configure projector interface
@@ -61,18 +61,21 @@ class Projector:
 
         return surface
 
-
     def generate_rasters(self):
         """Pre-generate all raster patterns into an ordered list"""
         total = self.cols * self.rows
         print(f"Generating {total} raster patterns...")
-        self.patterns = [self.raster_pattern(i) for i in range(total)]
+        return [self.raster_pattern(i) for i in range(total)]
+    
+    def proj_pattern(self, pattern):
+        """Generate one pattern with a single white square at index = pattern_number"""
+        self.screen.blit(pattern, (0, 0))
+        pygame.display.flip()
 
-
-    def run_patterns(self):
+    def test_projection(self):
         """Cycle through all patterns, blocking until ESP32 responds"""
         if not self.patterns:
-            self.generate_rasters()
+            self.patterns = self.generate_rasters()
 
         current = 0
         running = True
@@ -83,11 +86,11 @@ class Projector:
                     running = False
 
             # Draw current pattern
-            self.screen.blit(self.patterns[current], (0, 0))
-            pygame.display.flip()
+            self.proj_pattern(self.patterns[current])
 
-            # TODO: Thread Camera triggers here
             time.sleep(self.delay)
+            # TODO: Thread Camera triggers here
+
             current += 1
 
         pygame.quit()
