@@ -16,9 +16,9 @@ def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
     if pattern == "raster":
         patterns = projector.generate_rasters()
     elif pattern == "hadamard":
-        patterns = projector.generate_rasters()
+        patterns = projector.generate_hadamard()
     elif pattern == "random":
-        patterns = projector.generate_rasters()
+        patterns = projector.generate_random()
     else:
         return 
 
