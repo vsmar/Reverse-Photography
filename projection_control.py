@@ -68,29 +68,9 @@ class Projector:
                     self.square_size,
                 )
 
-            pygame.draw.rect(surface, (255, 255, 255), rect)
+                pygame.draw.rect(surface, (255, 255, 255), rect)
 
         return surface
-
-
-
-    # def raster_pattern(self, pattern_number):
-        
-    #     surface = pygame.Surface((self.proj.width, self.proj.height))
-    #     surface.fill((0, 0, 0))  # start black
-
-    #     # Compute which cell to turn white
-    #     x_idx = pattern_number % self.cols
-    #     y_idx = pattern_number // self.cols
-    #     rect = (
-    #         x_idx * self.square_size,
-    #         y_idx * self.square_size,
-    #         self.square_size,
-    #         self.square_size,
-    #     )
-    #     pygame.draw.rect(surface, (255, 255, 255), rect)
-
-    #     return surface
 
     def build_from_matrix(self, matrix):
         self.pattern_matrix = matrix.astype(np.uint8)
