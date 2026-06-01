@@ -68,7 +68,7 @@ class Projector:
                     self.square_size,
                 )
 
-        pygame.draw.rect(surface, (255, 255, 255), rect)
+            pygame.draw.rect(surface, (255, 255, 255), rect)
 
         return surface
 
@@ -94,7 +94,7 @@ class Projector:
 
     def build_from_matrix(self, matrix):
         self.pattern_matrix = matrix.astype(np.uint8)
-        self.patterns = [self.surface_mask(i) for i in range(self.pattern_matrix) ]
+        self.patterns = [self.surface_mask(i) for i in self.pattern_matrix]
         return self.patterns
         
 
