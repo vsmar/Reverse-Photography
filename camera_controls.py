@@ -9,17 +9,27 @@ OUTPUT_DIR = "captures"
 CAMERA_SERIALS = ["105322251697", "046322251346"]
 CAPTURE_INTERVAL_S = 0.2
 
+
 class CameraController:
     @staticmethod
     def start_pipeline(serial: str):
         pipeline = rs.pipeline()
         config = rs.config()
         config.enable_device(serial)
-        config.enable_stream(rs.stream.color, 480, 270, rs.format.bgr8, 5)
+        config.enable_stream(rs.stream.color, 480, 270, rs.format.bgr8, 30)
 
-        pipeline.start(config)
+        profile = pipeline.start(config)
+
+        # Set the color sensor's frame queue to hold only the newest frame.
+        # With queue size 1, wait_for_frames() never returns a stale frame,
+        # so we don't need a flush loop.
+        device = profile.get_device()
+        for sensor in device.query_sensors():
+            if sensor.supports(rs.option.frames_queue_size):
+                sensor.set_option(rs.option.frames_queue_size, 1)
+
         return pipeline
-    
+
     def dual_camera_setup(self, run_name="default_run"):
         pipelines = {}
 
@@ -30,13 +40,18 @@ class CameraController:
 
         print(f"Cameras initialized: {list(pipelines.keys())}")
 
-        time.sleep(1) # give the cameras time to warm up before requesting frames
+        # Let auto-exposure settle before capturing real frames
+        print("Warming up cameras...")
+        for cam_dir, pipeline in pipelines.items():
+            for _ in range(30):
+                pipeline.wait_for_frames(timeout_ms=2000)
 
         return pipelines
-    
+
     def capture_single_frame(self, pipelines, frame_id):
         for cam_dir, pipeline in pipelines.items():
-            frames = pipeline.wait_for_frames(timeout_ms=1500)
+            # Queue size 1 means this is always the most recent frame
+            frames = pipeline.wait_for_frames(timeout_ms=2000)
             color_frame = frames.get_color_frame()
 
             if not color_frame:
@@ -47,11 +62,11 @@ class CameraController:
             filename = os.path.join(cam_dir, f"frame_{frame_id}.png")
             cv2.imwrite(filename, image)
             print(f"Saved: {filename}")
-    
+
     def end_capture(self, pipelines):
         for pipeline in pipelines.values():
             pipeline.stop()
-     
+
     def test_capture(self, num_frames=10, interval_s: float = CAPTURE_INTERVAL_S):
         pipelines = self.dual_camera_setup("test_run")
 
@@ -63,10 +78,10 @@ class CameraController:
                 time.sleep(interval_s)
 
                 self.capture_single_frame(pipelines, i)
-                
+
         finally:
             self.end_capture(pipelines)
-            
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Capture RGB stills from two Intel RealSense D455 cameras.")

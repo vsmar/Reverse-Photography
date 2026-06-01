@@ -31,7 +31,7 @@ def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run"):
                     running = False
 
                 # Draw current pattern
-            projector.proj_pattern(patterns[i])
+            projector.proj_pattern(patterns[i*100%1200])
             time.sleep(delay_ms / 1000.0)
 
             controller.capture_single_frame(pipelines, i)
