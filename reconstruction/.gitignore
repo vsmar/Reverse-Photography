@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Reconstruction output
+*.ply
+
+# Stereo calibration cache (uncomment to keep it out of git;
+# leave commented if you want to share the calibration with the team)
+# calibration/*.npz
