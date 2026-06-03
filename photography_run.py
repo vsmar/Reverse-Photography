@@ -30,7 +30,7 @@ def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
     print(f"Starting capture of {num_frames} frames with interval {delay_ms}ms...")
     time.sleep(2)
 
-    i       = 0
+    i = 0
     running = True
 
     try:

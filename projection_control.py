@@ -9,7 +9,7 @@ OUTPUT_DIR = "patterns"
 
 
 class Projector:
-    def __init__(self, display_number=1, square_size=4, delay_ms=200):
+    def __init__(self, display_number=1, square_size=2, delay_ms=200):
         self.delay = delay_ms / 1000
         self.square_size = square_size or 1
 
@@ -85,33 +85,8 @@ class Projector:
     #  Pixel array sensing approach: using minimal patterned matrices    #
     # ------------------------------------------------------------------ #
 
-    A = np.array([[0,0,1,0],[1,1,1,0],[0,1,1,1],[0,1,0,0]], dtype=np.uint8)
-    B = np.array([[0,1,1,0],[1,0,0,1],[1,0,0,1],[0,1,1,0]], dtype=np.uint8)
-
-    # def generate_multiscale_masks_corner(self):
-    #     """
-    #     Same as generate_multiscale_masks but only projects the top-left corner
-    #     of each scaled mask — no tiling, overflow is cropped.
-    #     """
-    #     n_scales = int(np.log2(self.grid_dimensions // 4)) + 1
-    #     patterns = []
-
-    #     for i in range(n_scales):
-    #         scale = 4 * (2 ** i)  # 4, 8, 16, ..., grid_dimensions * 2
-
-    #         A_scaled = np.kron(self.A, np.ones((scale // 4, scale // 4), dtype=np.uint8))
-    #         B_scaled = np.kron(self.B, np.ones((scale // 4, scale // 4), dtype=np.uint8))
-
-    #         # Crop to grid_dimensions × grid_dimensions — no tiling
-    #         g = self.grid_dimensions
-    #         A_full = A_scaled[:g, :g]
-    #         B_full = B_scaled[:g, :g]
-
-    #         patterns.append(A_full.flatten())
-    #         patterns.append(B_full.flatten())
-
-    #     patterns.append(np.ones(self.n_cells, dtype=np.uint8))
-    #     return self._store_matrix(np.array(patterns))
+    A = np.array([[0,1,1,0],[1,0,0,1],[1,0,0,1],[0,1,1,0]], dtype=np.uint8)
+    B = np.array([[0,0,1,0],[1,1,1,0],[0,1,1,1],[0,1,0,0]], dtype=np.uint8)
 
     def generate_multiscale_masks(self):
         """
@@ -130,22 +105,26 @@ class Projector:
             out[:h, :w] = arr[:h, :w]
             return out
 
-        for i in range(n_scales):
-            block = 2 ** i          # pixels per base-mask cell: 1, 2, 4, ..., grid_dim/4
+        for i in range(n_scales + 1):
+            block = 2 ** i          # pixels per base-mask cell: 1, 2, 4, ..., grid_dim/4 + 1 (corner of matrix)
             scaled_size = 4 * block # full scaled mask size in pixels
 
             A_scaled = np.kron(self.A, np.ones((block, block), dtype=np.uint8))
             B_scaled = np.kron(self.B, np.ones((block, block), dtype=np.uint8))
 
-            reps = g // scaled_size          # how many times to tile
-            A_full = np.tile(A_scaled, (reps, reps))
-            B_full = np.tile(B_scaled, (reps, reps))
+            if (scaled_size < g):
+                reps = g // scaled_size          # how many times to tile
+                A_scaled = np.tile(A_scaled, (reps, reps))
+                B_scaled = np.tile(B_scaled, (reps, reps))
+            
+            A_scaled = fit_to_grid(A_scaled)
+            B_scaled = fit_to_grid(B_scaled)
 
-            patterns.append(A_full.flatten())
-            patterns.append(B_full.flatten())
+            patterns.append(A_scaled.flatten())
+            patterns.append(B_scaled.flatten())
 
         patterns.append(np.ones(g * g, dtype=np.uint8))  # white reference
-        return self._store_matrix(np.array(patterns))
+        return self._store_matrix(np.array(patterns)[::-1])
 
     # ------------------------------------------------------------------ #
     #  Projection                                                        #
