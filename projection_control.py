@@ -29,7 +29,7 @@ class Projector:
 
         # Center the grid on the projector surface
         self.grid_x = (self.proj.width  - self.grid_px) // 2
-        self.grid_y = (self.proj.height - self.grid_px) // 2
+        self.grid_y = (self.proj.height - self.grid_px)
 
         # Full-screen window on the chosen projector
         os.environ['SDL_VIDEO_WINDOW_POS'] = f"{self.proj.x},{self.proj.y}"

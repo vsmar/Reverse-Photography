@@ -7,9 +7,9 @@ import numpy as np
 
 
 def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
-                            pattern="hadamard", random_count=300, fill_prob=0.5,
-                            display_number=1):
-    projector = Proj(display_number=display_number, delay_ms=delay_ms)
+                            pattern="multiarray", random_count=300, fill_prob=0.5,
+                            display_number=1, square_size=3):
+    projector = Proj(display_number=display_number, delay_ms=delay_ms, square_size=square_size)
     controller = Cam()
 
     if pattern == "raster":
@@ -77,6 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--run-name",     type=str,   default="test_run", help="Output subfolder name.")
     parser.add_argument("--pattern",      choices=["raster", "hadamard", "multiarray"], default="multiarray")
     parser.add_argument("--display",      type=int,   default=1,          help="Monitor index for projector (0=primary).")
+    parser.add_argument("--square_size",  type=int,   default=4,          help="Projector pattern pixel resolution.")
     args = parser.parse_args()
 
     if args.test:
@@ -88,4 +89,5 @@ if __name__ == "__main__":
             run_name=args.run_name,
             pattern=args.pattern,
             display_number=args.display,
+            square_size=args.square_size,
         )
