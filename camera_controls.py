@@ -16,7 +16,7 @@ class CameraController:
         pipeline = rs.pipeline()
         config = rs.config()
         config.enable_device(serial)
-        config.enable_stream(rs.stream.color, 480, 270, rs.format.bgr8, 30)
+        config.enable_stream(rs.stream.color, 1280, 800, rs.format.bgr8, 30)
 
         profile = pipeline.start(config)
 
@@ -38,7 +38,7 @@ class CameraController:
             os.makedirs(cam_dir, exist_ok=True)
             pipelines[cam_dir] = self.start_pipeline(serial)
 
-        print(f"Cameras initialized: {list(pipelines.keys())}")
+        print(f"Cameras initialized: {CAMERA_SERIALS}")
 
         # Let auto-exposure settle before capturing real frames
         print("Warming up cameras...")
