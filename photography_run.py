@@ -77,7 +77,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run the projector + dual-camera capture, then optionally decode."
     )
-    parser.add_argument("--test",            action="store_true",  help="Run a short 3-frame smoke test.")
     parser.add_argument("--delay-ms",        type=float, default=200,        help="Delay between frames (ms).")
     parser.add_argument("--frames",          type=int,   default=None,       help="Number of frames. Defaults to all patterns.")
     parser.add_argument("--run-name",        type=str,   default="test_run", help="Output subfolder name.")
