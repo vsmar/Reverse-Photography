@@ -75,7 +75,7 @@ class CameraController:
             image = np.asanyarray(color_frame.get_data())
             filename = os.path.join(cam_dir, f"frame_{frame_id}.png")
             cv2.imwrite(filename, image)
-            print(f"Saved: {filename}")
+            # print(f"Saved: {filename}")
 
     def end_capture(self, pipelines):
         for pipeline in pipelines.values():

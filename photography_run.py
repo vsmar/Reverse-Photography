@@ -4,20 +4,21 @@ import argparse
 import time
 import pygame
 import numpy as np
+from tqdm import tqdm
 
 
 def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
-                            pattern="multiarray", random_count=300, fill_prob=0.5,
-                            display_number=1, square_size=3):
-    projector = Proj(display_number=display_number, delay_ms=delay_ms, square_size=square_size)
+                            pattern="structured", random_count=300, fill_prob=0.5,
+                            display_number=1, pattern_res_pxl=3):
+    projector = Proj(display_number=display_number, delay_ms=delay_ms, pattern_res_pxl=pattern_res_pxl)
     controller = Cam()
 
     if pattern == "raster":
         patterns = projector.generate_rasters()
     elif pattern == "hadamard":
         patterns = projector.generate_hadamard()
-    elif pattern == "multiarray":
-        patterns = projector.generate_multiscale_masks()
+    elif pattern == "structured":
+        patterns = projector.generate_structured_light()
     else:
         print(f"Unknown pattern type: {pattern}")
         return
@@ -30,25 +31,17 @@ def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
     print(f"Starting capture of {num_frames} frames with interval {delay_ms}ms...")
     time.sleep(2)
 
-    i = 0
-    running = True
-
     try:
-        while running and i < num_frames:
+        for i in tqdm(range(num_frames), desc="Capturing", unit="frame"):
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    running = False
-                    break
-
-            if not running:
-                break
+                    return
 
             projector.proj_pattern(patterns[i])
             time.sleep(delay_ms / 1000.0)
             controller.capture_single_frame(pipelines, i)
-            i += 1
 
-        print(f"Capture complete. {i}/{num_frames} frames saved.")
+        print(f"Capture complete. {i+1}/{num_frames} frames saved.")
 
     except Exception as e:
         print(f"Error during photography session: {e}")
@@ -58,15 +51,6 @@ def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
         controller.end_capture(pipelines)
         projector.quit()
 
-
-def test_photography_session(delay_ms=500, display_number=1):
-    """Run a short 3-frame smoke test."""
-    run_photography_session(
-        delay_ms=delay_ms, num_frames=3,
-        run_name="test_run", display_number=display_number
-    )
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run the projector and dual-camera photography session."
@@ -75,19 +59,16 @@ if __name__ == "__main__":
     parser.add_argument("--delay-ms",     type=float, default=200,        help="Delay between frames (ms).")
     parser.add_argument("--frames",       type=int,   default=None,       help="Number of frames. Defaults to all patterns.")
     parser.add_argument("--run-name",     type=str,   default="test_run", help="Output subfolder name.")
-    parser.add_argument("--pattern",      choices=["raster", "hadamard", "multiarray"], default="multiarray")
+    parser.add_argument("--pattern",      choices=["raster", "hadamard", "structured"], default="structured")
     parser.add_argument("--display",      type=int,   default=1,          help="Monitor index for projector (0=primary).")
-    parser.add_argument("--square_size",  type=int,   default=4,          help="Projector pattern pixel resolution.")
+    parser.add_argument("--pattern_res_pxl",  type=int,   default=4,          help="Projector pattern pixel resolution.")
     args = parser.parse_args()
 
-    if args.test:
-        test_photography_session(delay_ms=args.delay_ms, display_number=args.display)
-    else:
-        run_photography_session(
-            delay_ms=args.delay_ms,
-            num_frames=args.frames,
-            run_name=args.run_name,
-            pattern=args.pattern,
-            display_number=args.display,
-            square_size=args.square_size,
-        )
+    run_photography_session(
+        delay_ms=args.delay_ms,
+        num_frames=args.frames,
+        run_name=args.run_name,
+        pattern=args.pattern,
+        display_number=args.display,
+        pattern_res_pxl=args.pattern_res_pxl,
+    )

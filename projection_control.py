@@ -9,9 +9,9 @@ OUTPUT_DIR = "patterns"
 
 
 class Projector:
-    def __init__(self, display_number=1, square_size=2, delay_ms=200):
+    def __init__(self, display_number=1, pattern_res_pxl=2, delay_ms=200):
         self.delay = delay_ms / 1000
-        self.square_size = square_size or 1
+        self.pattern_res_pxl = pattern_res_pxl or 1
 
         pygame.init()
         monitors = get_monitors()
@@ -19,13 +19,13 @@ class Projector:
 
         # Largest power-of-2 grid that fits the projector
         self.max_power_2 = int(np.floor(np.log2(
-            min(self.proj.width, self.proj.height) / self.square_size
+            min(self.proj.width, self.proj.height) / self.pattern_res_pxl
         )))
         self.grid_dimensions = int(2 ** self.max_power_2)
         self.n_cells = self.grid_dimensions ** 2
 
         # Pixel extent of the square grid
-        self.grid_px = self.grid_dimensions * self.square_size
+        self.grid_px = self.grid_dimensions * self.pattern_res_pxl
 
         # Center the grid on the projector surface
         self.grid_x = (self.proj.width  - self.grid_px) // 2
@@ -46,9 +46,8 @@ class Projector:
             f"Configuration:\n"
             f"  Projector:  {self.proj.width}x{self.proj.height}\n"
             f"  Grid:       {self.grid_dimensions}x{self.grid_dimensions} cells\n"
-            f"  Square:     {self.square_size} px\n"
+            f"  Square:     {self.pattern_res_pxl} px\n"
             f"  Grid area:  {self.grid_px}x{self.grid_px} px "
-            f"centered at ({self.grid_x}, {self.grid_y})"
         )
 
     # ------------------------------------------------------------------ #
@@ -88,9 +87,9 @@ class Projector:
     A = np.array([[0,1,1,0],[1,0,0,1],[1,0,0,1],[0,1,1,0]], dtype=np.uint8)
     B = np.array([[0,0,1,0],[1,1,1,0],[0,1,1,1],[0,1,0,0]], dtype=np.uint8)
 
-    def generate_multiscale_masks(self):
+    def generate_structured_light(self):
         """
-        Core multiscale pattern generator.
+        Core structured light pattern generator.
         tile=True:  fill the grid by tiling the scaled mask
         tile=False: show only the top-left corner, pad remainder with zeros
         """
@@ -164,7 +163,7 @@ class Projector:
         meta = {
             "grid_dimensions": self.grid_dimensions,
             "n_cells":         self.n_cells,
-            "square_size":     self.square_size,
+            "pattern_res_pxl": self.pattern_res_pxl,
             "grid_px":         self.grid_px,
             "grid_x":          self.grid_x,
             "grid_y":          self.grid_y,
