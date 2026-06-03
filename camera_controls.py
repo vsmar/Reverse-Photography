@@ -16,7 +16,7 @@ class CameraController:
         pipeline = rs.pipeline()
         config = rs.config()
         config.enable_device(serial)
-        config.enable_stream(rs.stream.color, 1280, 800, rs.format.bgr8, 30)
+        config.enable_stream(rs.stream.color, 1280, 800, rs.format.bgr8, 30) # , exposure=100, gain=0)
 
         profile = pipeline.start(config)
 
@@ -25,10 +25,24 @@ class CameraController:
         # so we don't need a flush loop.
         device = profile.get_device()
         for sensor in device.query_sensors():
+            if sensor.get_info(rs.camera_info.name) != 'RGB Camera':
+                continue # motion and stereo module not used
             if sensor.supports(rs.option.frames_queue_size):
                 sensor.set_option(rs.option.frames_queue_size, 1)
 
+            # Only apply to the color sensor
+            if sensor.supports(rs.option.exposure):
+                # Disable auto-exposure first, otherwise manual value is ignored
+                sensor.set_option(rs.option.enable_auto_exposure, 0)
+                sensor.set_option(rs.option.exposure, 100)
+
+            if sensor.supports(rs.option.gain):
+                gain_range = sensor.get_option_range(rs.option.gain)
+                # print(f"Gain range: {gain_range.min} - {gain_range.max}, step {gain_range.step}, default {gain_range.default}")
+                sensor.set_option(rs.option.gain, 0)
+
         return pipeline
+
 
     def dual_camera_setup(self, run_name="default_run"):
         pipelines = {}
