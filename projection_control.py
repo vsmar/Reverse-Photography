@@ -82,7 +82,7 @@ class Projector:
         return self._store_matrix(matrix)
     
     # ------------------------------------------------------------------ #
-    #  Pixel array sensing approach: using  storing the matrix           #
+    #  Pixel array sensing approach: using minimal patterned matrices    #
     # ------------------------------------------------------------------ #
 
     A = np.array([[0,0,1,0],[1,1,1,0],[0,1,1,1],[0,1,0,0]], dtype=np.uint8)
