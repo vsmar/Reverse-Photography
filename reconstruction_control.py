@@ -21,6 +21,7 @@ import glob
 import argparse
 import numpy as np
 import cv2
+from camera_controls import CameraController as Cam, CAMERA_SERIALS, OUTPUT_DIR
 
 
 def build_codebook(matrix):
@@ -190,7 +191,7 @@ def find_matrix(patterns_root, run_name, pattern):
     return matrix, grid_meta
 
 
-def run_decode(run_name, pattern, serials,
+def run_decode(run_name, pattern, serials=FileNotFoundError,
                captures_root="captures", patterns_root="patterns",
                contrast_frac=0.2, color=False, only_serial=None):
     """Decode camera(s) in a run and save dual photos.
@@ -207,6 +208,9 @@ def run_decode(run_name, pattern, serials,
     matrix, grid_meta = find_matrix(patterns_root, run_name, pattern)
     print(f"Loaded matrix {matrix.shape}, grid "
           f"{grid_meta['grid_dimensions']}x{grid_meta['grid_dimensions']}")
+    
+    if serials is None:
+        serials = CAMERA_SERIALS
 
     if only_serial is not None:
         if only_serial not in serials:
@@ -240,10 +244,8 @@ if __name__ == "__main__":
                     "into projector's-point-of-view dual photos."
     )
     parser.add_argument("--run-name", required=True)
-    parser.add_argument("--pattern", default="multiarray",
-                        help="Pattern subfolder name used when saving the matrix.")
-    parser.add_argument("--serials", nargs="+", required=True,
-                        help="Camera serial folder names available to decode.")
+    parser.add_argument("--pattern",        default="structured")
+    parser.add_argument("--serials",        nargs="+", required=False, default=None)
     parser.add_argument("--serial", default=None,
                         help="Decode only this one serial (must be among --serials, "
                              "or any folder that exists). Omit to decode all.")
