@@ -20,7 +20,7 @@ def _wait_ms(ms):
         pygame.time.wait(30)
 
 
-def run_session(run_name="test_run", pattern="structured", inverse=True,
+def run_session(run_name="test_run", pattern="structured", compliment=True,
                 delay_ms=500, settle_ms=100, flush_frames=2,
                 display_number=1, pattern_res_pxl=4, decode=False):
 
@@ -30,7 +30,7 @@ def run_session(run_name="test_run", pattern="structured", inverse=True,
     # Set up projector
     projector = Projector(display_number=display_number,
                           pattern_res_pxl=pattern_res_pxl,
-                          inverse=inverse)
+                          compliment=compliment)
 
     if pattern == "raster":
         projector.generate_rasters()
@@ -39,7 +39,7 @@ def run_session(run_name="test_run", pattern="structured", inverse=True,
     else:
         projector.generate_structured_light()
 
-    base_matrix = projector.pattern_matrix[0::2] if inverse else projector.pattern_matrix
+    base_matrix = projector.pattern_matrix[0::2] if compliment else projector.pattern_matrix
     np.save(os.path.join(run_dir, "pattern_matrix.npy"), base_matrix)
 
     # Set up cameras
@@ -56,7 +56,7 @@ def run_session(run_name="test_run", pattern="structured", inverse=True,
     # Store metadata
     meta = {
         "pattern": pattern,
-        "inverse": inverse,
+        "compliment": compliment,
         "grid_dimensions": projector.grid_dimensions,
         "n_cells": projector.n_cells,
         "pattern_res_pxl": projector.pattern_res_pxl,
@@ -96,7 +96,7 @@ def run_session(run_name="test_run", pattern="structured", inverse=True,
         cam_dir = os.path.join(run_dir, serial)
         raw_dir = raw_dirs[serial]
 
-        if inverse:
+        if compliment:
             for i in tqdm(range(projector.num_base_patterns),
                           desc=f"Processing {serial}", unit="frame"):
 
@@ -107,7 +107,7 @@ def run_session(run_name="test_run", pattern="structured", inverse=True,
                 inv = cv2.imread(inv_path, cv2.IMREAD_COLOR)
 
                 if orig is None or inv is None:
-                    print(f"[WARN] Missing inverse pair {i} for {serial}")
+                    print(f"[WARN] Missing compliment pair {i} for {serial}")
                     continue
 
                 if i == 0:
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-name", default="test_run")
     parser.add_argument("--pattern", default="structured")
-    parser.add_argument("--inverse", action="store_true", help="use inverse patterns")
+    parser.add_argument("--compliment", action="store_true", help="use compliment patterns")
     parser.add_argument("--decode", action="store_true")
     parser.add_argument("--delay", type=int, default=200, help="Hold time after capture (ms)")
     parser.add_argument("--settle", type=int, default=200, help="Settle time before capture (ms)")
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     run_session(
         run_name=args.run_name,
         pattern=args.pattern,
-        inverse=args.inverse,
+        compliment=args.compliment,
         delay_ms=args.delay,
         settle_ms=args.settle,
         flush_frames=args.flush_frames,
