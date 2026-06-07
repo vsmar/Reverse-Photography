@@ -14,8 +14,12 @@ class Config:
     # --- Cameras -----------------------------------------------------------
     # RealSense serial numbers (from camera_controls.py).
     camera_serials: tuple = ("105322251697", "046322251346")
-    image_width: int = 480
-    image_height: int = 270
+    # MUST match the resolution the cameras actually capture at (RealSense D455
+    # color stream is configured for 1280x800 in camera_controls.py). The
+    # checkerboard images and the factory-intrinsics read in calibration.py both
+    # use this size, so a mismatch silently corrupts the calibration.
+    image_width: int = 1280
+    image_height: int = 800
 
     # --- Capture layout ----------------------------------------------------
     # Root folder produced by photography_run.py.
@@ -47,10 +51,12 @@ class Config:
 
     # --- Calibration -------------------------------------------------------
     # Checkerboard for stereo extrinsics. NOTE: counts are INNER corners,
-    # not squares (a board with 10x7 squares has 9x6 inner corners).
-    checkerboard_cols: int = 9
-    checkerboard_rows: int = 6
-    checkerboard_square_mm: float = 25.0
+    # not squares (inner corners = squares - 1 in each direction).
+    # Physical board: 8 squares wide x 6 squares tall, 15 mm squares
+    # -> inner corners 7 wide (cols) x 5 tall (rows). OpenCV wants (cols, rows).
+    checkerboard_cols: int = 7
+    checkerboard_rows: int = 5
+    checkerboard_square_mm: float = 15.0
     checkerboard_dir: str = "calibration/checkerboard"
     # Where the computed stereo calibration is cached.
     calibration_path: str = "calibration/stereo_calib.npz"
