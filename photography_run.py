@@ -1,104 +1,160 @@
-from camera_controls import CameraController as Cam, CAMERA_SERIALS, OUTPUT_DIR
-from projection_control import Projector as Proj
-import argparse
-import time
+﻿import os
+import json
+import cv2
 import pygame
 import numpy as np
 from tqdm import tqdm
+from camera_controls import CameraController
+from projection_control import Projector
 import reconstruction_control as decoder
 
 
-def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
-                            pattern="structured", random_count=300, fill_prob=0.5,
-                            display_number=1, pattern_res_pxl=3,
-                            decode=False, contrast_frac=0.2, color_dual=False,
-                            decode_serial=None):
-    projector = Proj(display_number=display_number, delay_ms=delay_ms, pattern_res_pxl=pattern_res_pxl)
-    controller = Cam()
+CAMERA_SERIALS = ["105322251697", "046322251346"]
+OUTPUT_DIR = "captures"
+
+# breaks up waiting into smaller chunks to allow intermediate processing
+def _wait_ms(ms):
+    end = pygame.time.get_ticks() + ms
+    while pygame.time.get_ticks() < end:
+        pygame.event.pump()
+        pygame.time.wait(30)
+
+
+def run_session(run_name="test_run", pattern="structured", inverse=True,
+                delay_ms=500, settle_ms=100, flush_frames=2,
+                display_number=1, pattern_res_pxl=4, decode=False):
+
+    run_dir = os.path.join(OUTPUT_DIR, run_name)
+    os.makedirs(run_dir, exist_ok=True)
+
+    # Set up projector
+    projector = Projector(display_number=display_number,
+                          pattern_res_pxl=pattern_res_pxl,
+                          inverse=inverse)
 
     if pattern == "raster":
-        patterns = projector.generate_rasters()
+        projector.generate_rasters()
     elif pattern == "hadamard":
-        patterns = projector.generate_hadamard()
-    elif pattern == "structured":
-        patterns = projector.generate_structured_light()
+        projector.generate_hadamard()
     else:
-        print(f"Unknown pattern type: {pattern}")
-        return
+        projector.generate_structured_light()
 
-    projector.save_pattern_matrix(run_name=run_name, pattern=pattern)
+    base_matrix = projector.pattern_matrix[0::2] if inverse else projector.pattern_matrix
+    np.save(os.path.join(run_dir, "pattern_matrix.npy"), base_matrix)
 
-    num_frames = min(num_frames, len(patterns)) if num_frames is not None else len(patterns)
-    pipelines = controller.dual_camera_setup(run_name)
+    # Set up cameras
+    cam = CameraController(CAMERA_SERIALS)
+    cam.setup_cameras()
 
-    print(f"Starting capture of {num_frames} frames with interval {delay_ms}ms...")
-    time.sleep(2)
+    raw_dirs = {}
+    for serial in CAMERA_SERIALS:
+        cam_dir = os.path.join(run_dir, serial)
+        raw_dir = os.path.join(cam_dir, "raw")
+        os.makedirs(raw_dir, exist_ok=True)
+        raw_dirs[serial] = raw_dir
 
-    captured = 0
+    # Store metadata
+    meta = {
+        "pattern": pattern,
+        "inverse": inverse,
+        "grid_dimensions": projector.grid_dimensions,
+        "n_cells": projector.n_cells,
+        "pattern_res_pxl": projector.pattern_res_pxl,
+        "settle_ms": settle_ms,
+        "delay_ms": delay_ms,
+        "flush_frames": flush_frames,
+        "camera_serials": CAMERA_SERIALS,
+    }
+
+    with open(os.path.join(run_dir, "metadata.json"), "w") as f:
+        json.dump(meta, f, indent=2)
+
+    # Capture loop
+    n = len(projector.patterns)
     try:
-        for i in tqdm(range(num_frames), desc="Capturing", unit="frame"):
-            for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    return
+        with tqdm(total=n, desc=f"Capturing ({pattern})", unit="frame") as pbar:
+            for i in projector.patterns:
+                pygame.event.pump()
 
-            projector.proj_pattern(patterns[i])
-            time.sleep(delay_ms / 1000.0)
-            controller.capture_single_frame(pipelines, i)
-            captured = i + 1
+                projector.proj_pattern(i)
+                _wait_ms(settle_ms)
 
-        print(f"Capture complete. {captured}/{num_frames} frames saved.")
+                for serial in CAMERA_SERIALS:
+                    frame = cam.capture_frame(serial, flush_frames=flush_frames)
+                    if frame is not None:
+                        raw_path = os.path.join(raw_dirs[serial], f"raw_{i:04d}.png")
+                        cv2.imwrite(raw_path, frame)
 
-    except Exception as e:
-        print(f"Error during photography session: {e}")
-        raise
+                _wait_ms(delay_ms)
+                pbar.update(1)
 
     finally:
-        controller.end_capture(pipelines)
+        cam.stop_cameras()
         projector.quit()
 
-    # ---- Decode stage (runs after capture + projector teardown) ----
+    for serial in CAMERA_SERIALS:
+        cam_dir = os.path.join(run_dir, serial)
+        raw_dir = raw_dirs[serial]
+
+        if inverse:
+            for i in tqdm(range(projector.num_base_patterns),
+                          desc=f"Processing {serial}", unit="frame"):
+
+                orig_path = os.path.join(raw_dir, f"raw_{2*i:04d}.png")
+                inv_path = os.path.join(raw_dir, f"raw_{2*i + 1:04d}.png")
+
+                orig = cv2.imread(orig_path, cv2.IMREAD_COLOR)
+                inv = cv2.imread(inv_path, cv2.IMREAD_COLOR)
+
+                if orig is None or inv is None:
+                    print(f"[WARN] Missing inverse pair {i} for {serial}")
+                    continue
+
+                if i == 0:
+                    cv2.imwrite(os.path.join(cam_dir, "frame_0.png"), orig)
+                else:
+                    mask = (orig.astype(np.float32) > inv.astype(np.float32)).astype(np.uint8) * 255
+                    cv2.imwrite(os.path.join(cam_dir, f"frame_{i}.png"), mask)
+
+        else:
+            for i in tqdm(range(n), desc=f"Processing {serial}", unit="frame"):
+                raw_path = os.path.join(raw_dir, f"raw_{i:04d}.png")
+                frame = cv2.imread(raw_path, cv2.IMREAD_COLOR)
+
+                if frame is None:
+                    print(f"[WARN] Missing raw frame {i} for {serial}")
+                    continue
+
+                cv2.imwrite(os.path.join(cam_dir, f"frame_{i}.png"), frame)
+
     if decode:
-        if captured < num_frames:
-            print("Capture was interrupted; skipping decode (incomplete frame set).")
-            return
-        print("\n=== Decoding captures into dual photos ===")
-        decoder.run_decode(
-            run_name=run_name,
-            pattern=pattern,
-            serials=CAMERA_SERIALS,
-            captures_root=OUTPUT_DIR,
-            contrast_frac=contrast_frac,
-            color=color_dual,
-            only_serial=decode_serial,
-        )
+        print("Decoding...")
+        decoder.run_decode(run_name, pattern, serials=CAMERA_SERIALS)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run the projector + dual-camera capture, then optionally decode."
-    )
-    parser.add_argument("--delay-ms",        type=float, default=200,        help="Delay between frames (ms).")
-    parser.add_argument("--frames",          type=int,   default=None,       help="Number of frames. Defaults to all patterns.")
-    parser.add_argument("--run-name",        type=str,   default="test_run", help="Output subfolder name.")
-    parser.add_argument("--pattern",         choices=["raster", "hadamard", "structured"], default="structured")
-    parser.add_argument("--display",         type=int,   default=1,          help="Monitor index for projector (0=primary).")
-    parser.add_argument("--pattern_res_pxl", type=int,   default=4,          help="Projector pattern pixel resolution.")
-    # decode options
-    parser.add_argument("--decode",          action="store_true", help="Decode into dual photos after capture.")
-    parser.add_argument("--contrast-frac",   type=float, default=0.2,        help="Min contrast (fraction of reference) to trust a pixel.")
-    parser.add_argument("--color-dual",      action="store_true", help="Build color dual photo(s) from the reference frame.")
-    parser.add_argument("--decode-serial",   default=None,        help="Decode only this one camera serial. Omit to decode all.")
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run-name", default="test_run")
+    parser.add_argument("--pattern", default="structured")
+    parser.add_argument("--inverse", action="store_true", help="use inverse patterns")
+    parser.add_argument("--decode", action="store_true")
+    parser.add_argument("--delay", type=int, default=200, help="Hold time after capture (ms)")
+    parser.add_argument("--settle", type=int, default=200, help="Settle time before capture (ms)")
+    parser.add_argument("--flush-frames", type=int, default=2, help="Frames to discard before capture")
+    parser.add_argument("--res", type=int, default=4, help="Pattern resolution (px)")
+    parser.add_argument("--display", type=int, default=1, help="Monitor index for projector")
     args = parser.parse_args()
 
-    run_photography_session(
-        delay_ms=args.delay_ms,
-        num_frames=args.frames,
+    run_session(
         run_name=args.run_name,
         pattern=args.pattern,
+        inverse=args.inverse,
+        delay_ms=args.delay,
+        settle_ms=args.settle,
+        flush_frames=args.flush_frames,
+        pattern_res_pxl=args.res,
         display_number=args.display,
-        pattern_res_pxl=args.pattern_res_pxl,
         decode=args.decode,
-        contrast_frac=args.contrast_frac,
-        color_dual=args.color_dual,
-        decode_serial=args.decode_serial,
     )
