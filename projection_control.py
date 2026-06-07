@@ -153,7 +153,7 @@ class Projector:
         pygame.display.flip()
 
     # ------------------------------------------------------------------ #
-    #  Persistence                                                         #
+    #  Persistence                                                       #
     # ------------------------------------------------------------------ #
 
     def save_pattern_matrix(self, run_name="default_run", pattern="rasters"):
@@ -173,7 +173,7 @@ class Projector:
         np.save(os.path.join(pattern_dir, "grid_meta.npy"), meta)
 
     # ------------------------------------------------------------------ #
-    #  Lifecycle                                                           #
+    #  Lifecycle                                                         #
     # ------------------------------------------------------------------ #
 
     def quit(self):

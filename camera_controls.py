@@ -34,7 +34,7 @@ class CameraController:
             if sensor.supports(rs.option.exposure):
                 # Disable auto-exposure first, otherwise manual value is ignored
                 sensor.set_option(rs.option.enable_auto_exposure, 0)
-                sensor.set_option(rs.option.exposure, 100)
+                sensor.set_option(rs.option.exposure, 200)
 
             if sensor.supports(rs.option.gain):
                 gain_range = sensor.get_option_range(rs.option.gain)
