@@ -1,112 +1,84 @@
-import pyrealsense2 as rs
+﻿import pyrealsense2 as rs
 import numpy as np
 import cv2
-import os
-import time
-import argparse
-
-OUTPUT_DIR = "captures"
-CAMERA_SERIALS = ["105322251697", "046322251346"]
-CAPTURE_INTERVAL_S = 0.2
+import threading
 
 
 class CameraController:
-    @staticmethod
-    def start_pipeline(serial: str):
-        pipeline = rs.pipeline()
-        config = rs.config()
-        config.enable_device(serial)
-        config.enable_stream(rs.stream.color, 1280, 800, rs.format.bgr8, 30) # , exposure=100, gain=0)
+    def __init__(self, serials):
+        self.serials = serials
+        self.pipelines = {}
 
-        profile = pipeline.start(config)
+    def setup_cameras(self):
+        for serial in self.serials:
+            pipeline = rs.pipeline()
+            config = rs.config()
+            config.enable_device(serial)
+            config.enable_stream(rs.stream.color, 1280, 800, rs.format.bgr8, 30)
+            profile = pipeline.start(config)
 
-        # Set the color sensor's frame queue to hold only the newest frame.
-        # With queue size 1, wait_for_frames() never returns a stale frame,
-        # so we don't need a flush loop.
-        device = profile.get_device()
-        for sensor in device.query_sensors():
-            if sensor.get_info(rs.camera_info.name) != 'RGB Camera':
-                continue # motion and stereo module not used
-            if sensor.supports(rs.option.frames_queue_size):
-                sensor.set_option(rs.option.frames_queue_size, 1)
+            device = profile.get_device()
+            for sensor in device.query_sensors():
+                if sensor.get_info(rs.camera_info.name) == "RGB Camera":
+                    if sensor.supports(rs.option.frames_queue_size):
+                        sensor.set_option(rs.option.frames_queue_size, 1)
+                    if sensor.supports(rs.option.enable_auto_exposure):     # disable auto-exposure
+                        sensor.set_option(rs.option.enable_auto_exposure, 0)
+                        if sensor.supports(rs.option.exposure):
+                            sensor.set_option(rs.option.exposure, 200)
+                    if sensor.supports(rs.option.gain):
+                        sensor.set_option(rs.option.gain, 0)
 
-            # Only apply to the color sensor
-            if sensor.supports(rs.option.exposure):
-                # Disable auto-exposure first, otherwise manual value is ignored
-                sensor.set_option(rs.option.enable_auto_exposure, 0)
-                sensor.set_option(rs.option.exposure, 100)
+            self.pipelines[serial] = pipeline
 
-            if sensor.supports(rs.option.gain):
-                gain_range = sensor.get_option_range(rs.option.gain)
-                # print(f"Gain range: {gain_range.min} - {gain_range.max}, step {gain_range.step}, default {gain_range.default}")
-                sensor.set_option(rs.option.gain, 0)
-
-        return pipeline
-
-
-    def dual_camera_setup(self, run_name="default_run"):
-        pipelines = {}
-
-        for serial in CAMERA_SERIALS:
-            cam_dir = os.path.join(OUTPUT_DIR, run_name, serial)
-            os.makedirs(cam_dir, exist_ok=True)
-            pipelines[cam_dir] = self.start_pipeline(serial)
-
-        print(f"Cameras initialized: {CAMERA_SERIALS}")
-
-        # Let auto-exposure settle before capturing real frames
         print("Warming up cameras...")
-        for cam_dir, pipeline in pipelines.items():
-            for _ in range(30):
-                pipeline.wait_for_frames(timeout_ms=2000)
+        for _ in range(30):
+            for pipeline in self.pipelines.values():
+                pipeline.wait_for_frames()
 
-        return pipelines
+    def capture_frame(self, serial, flush_frames=2, timeout_ms=5000):
+        pipeline = self.pipelines[serial]
 
-    def capture_single_frame(self, pipelines, frame_id):
-        for cam_dir, pipeline in pipelines.items():
-            # Queue size 1 means this is always the most recent frame
-            frames = pipeline.wait_for_frames(timeout_ms=2000)
-            color_frame = frames.get_color_frame()
+        # Drop frames that may have started exposure before/during the projector transition.
+        for _ in range(flush_frames):
+            pipeline.wait_for_frames(timeout_ms=timeout_ms)
 
-            if not color_frame:
-                print(f"No frame received from {cam_dir}.")
-                continue
+        frames = pipeline.wait_for_frames(timeout_ms=timeout_ms)
+        color = frames.get_color_frame()
+        if not color:
+            return None
 
-            image = np.asanyarray(color_frame.get_data())
-            filename = os.path.join(cam_dir, f"frame_{frame_id}.png")
-            cv2.imwrite(filename, image)
-            # print(f"Saved: {filename}")
+        return np.asanyarray(color.get_data()).copy()
 
-    def end_capture(self, pipelines):
-        for pipeline in pipelines.values():
+    def stop_cameras(self):
+        for pipeline in self.pipelines.values():
             pipeline.stop()
 
-    def test_capture(self, num_frames=10, interval_s: float = CAPTURE_INTERVAL_S):
-        pipelines = self.dual_camera_setup("test_run")
 
-        print(f"Starting capture of {num_frames} frames with interval {interval_s}s...")
+if __name__ == '__main__':
+    import argparse
+    import time
+    import os
 
-        try:
-            for i in range(num_frames):
-                # Delay time for projection
-                time.sleep(interval_s)
-
-                self.capture_single_frame(pipelines, i)
-
-        finally:
-            self.end_capture(pipelines)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Capture RGB stills from two Intel RealSense D455 cameras.")
-    parser.add_argument("num_frames", type=int, help="Number of frames to capture.")
-    parser.add_argument(
-        "--interval-ms",
-        type=float,
-        default=CAPTURE_INTERVAL_S * 1000,
-        help="Delay between projector update and frame capture, in milliseconds.",
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--frames", type=int, default=10, help="Number of frames to capture.")
+    parser.add_argument("--delay",  type=int, default=500, help="Interval between captures (ms).")
+    parser.add_argument("--serials", nargs="+", default=["105322251697", "046322251346"])
     args = parser.parse_args()
 
-    controller = CameraController()
-    controller.test_capture(args.num_frames, interval_s=args.interval_ms / 1000.0)
+    cam = CameraController(args.serials)
+    cam.setup_cameras()
+
+    for serial in cam.serials:
+        os.makedirs(rf"camera_test\{serial}", exist_ok=True)
+
+    for i in range(args.frames):
+        for serial in cam.serials:
+            frame = cam.capture_frame(serial)
+            if frame is not None:
+                path = rf"camera_test\{serial}\test_{i}.png"
+                cv2.imwrite(path, frame)
+                print(f"Saved frame {i+1}/{args.frames} from {serial}")
+        time.sleep(args.delay / 1000)
+
+    cam.stop_cameras()
