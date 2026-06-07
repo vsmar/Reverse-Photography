@@ -62,20 +62,35 @@ class CameraController:
 
         return pipelines
 
-    def capture_single_frame(self, pipelines, frame_id):
+    def capture_black_frame(self, pipelines):
+        """Capture one projector-off calibration frame per camera, saved as
+        frame_black.png. The decoder subtracts this from every pattern frame
+        to remove ambient + projector dark-level leakage."""
         for cam_dir, pipeline in pipelines.items():
-            # Queue size 1 means this is always the most recent frame
             frames = pipeline.wait_for_frames(timeout_ms=2000)
             color_frame = frames.get_color_frame()
+            if not color_frame:
+                print(f"No black frame received from {cam_dir}.")
+                continue
+            image = np.asanyarray(color_frame.get_data())
+            filename = os.path.join(cam_dir, "frame_black.png")
+            cv2.imwrite(filename, image)
 
+    def capture_single_frame(self, pipelines, frame_id):
+        # Phase 1: flush every camera to the freshest frame (post-pattern)
+        fresh = {}
+        for cam_dir, pipeline in pipelines.items():
+            # one wait clears the held frame, the next is genuinely current
+            pipeline.wait_for_frames(timeout_ms=3000)
+            frames = pipeline.wait_for_frames(timeout_ms=3000)
+            color_frame = frames.get_color_frame()
             if not color_frame:
                 print(f"No frame received from {cam_dir}.")
                 continue
-
-            image = np.asanyarray(color_frame.get_data())
-            filename = os.path.join(cam_dir, f"frame_{frame_id}.png")
-            cv2.imwrite(filename, image)
-            # print(f"Saved: {filename}")
+            fresh[cam_dir] = np.asanyarray(color_frame.get_data()).copy()
+        # Phase 2: write them all
+        for cam_dir, image in fresh.items():
+            cv2.imwrite(os.path.join(cam_dir, f"frame_{frame_id}.png"), image)
 
     def end_capture(self, pipelines):
         for pipeline in pipelines.values():

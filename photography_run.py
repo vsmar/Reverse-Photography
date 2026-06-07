@@ -12,8 +12,8 @@ def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
                             pattern="structured", random_count=300, fill_prob=0.5,
                             display_number=1, pattern_res_pxl=3,
                             decode=False, contrast_frac=0.2, color_dual=False,
-                            decode_serial=None):
-    projector = Proj(display_number=display_number, delay_ms=delay_ms, pattern_res_pxl=pattern_res_pxl)
+                            decode_serial=None, ref_floor=30.0, margin=3.0):
+    projector = Proj(display_number=display_number, delay_ms=delay_ms, square_size=pattern_res_pxl)
     controller = Cam()
 
     if pattern == "raster":
@@ -21,18 +21,26 @@ def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
     elif pattern == "hadamard":
         patterns = projector.generate_hadamard()
     elif pattern == "structured":
-        patterns = projector.generate_structured_light()
+        patterns = projector.generate_structured_light_complementary()
     else:
         print(f"Unknown pattern type: {pattern}")
         return
 
-    projector.save_pattern_matrix(run_name=run_name, pattern=pattern)
+    projector.save_pattern_matrix(run_name=run_name, pattern=pattern,
+                                  complementary=(pattern == "structured"))
 
     num_frames = min(num_frames, len(patterns)) if num_frames is not None else len(patterns)
     pipelines = controller.dual_camera_setup(run_name)
 
     print(f"Starting capture of {num_frames} frames with interval {delay_ms}ms...")
     time.sleep(2)
+
+    # Black calibration frame: projector shows black, capture once per camera.
+    # The decoder subtracts this to remove ambient + projector dark-level.
+    projector.screen.fill((0, 0, 0))
+    pygame.display.flip()
+    time.sleep(delay_ms / 1000.0)
+    controller.capture_black_frame(pipelines)
 
     captured = 0
     try:
@@ -44,6 +52,8 @@ def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
             projector.proj_pattern(patterns[i])
             time.sleep(delay_ms / 1000.0)
             controller.capture_single_frame(pipelines, i)
+            time.sleep(delay_ms / 1000.0)
+
             captured = i + 1
 
         print(f"Capture complete. {captured}/{num_frames} frames saved.")
@@ -70,6 +80,8 @@ def run_photography_session(delay_ms=500, num_frames=None, run_name="test_run",
             contrast_frac=contrast_frac,
             color=color_dual,
             only_serial=decode_serial,
+            ref_floor=ref_floor,
+            margin=margin,
         )
 
 
@@ -88,6 +100,8 @@ if __name__ == "__main__":
     parser.add_argument("--contrast-frac",   type=float, default=0.2,        help="Min contrast (fraction of reference) to trust a pixel.")
     parser.add_argument("--color-dual",      action="store_true", help="Build color dual photo(s) from the reference frame.")
     parser.add_argument("--decode-serial",   default=None,        help="Decode only this one camera serial. Omit to decode all.")
+    parser.add_argument("--ref-floor",       type=float, default=30.0, help="Min absolute reference brightness to trust a pixel.")
+    parser.add_argument("--margin",          type=float, default=3.0,  help="Complementary: drop bits where |code-inverse| <= margin.")
     args = parser.parse_args()
 
     run_photography_session(
@@ -101,4 +115,6 @@ if __name__ == "__main__":
         contrast_frac=args.contrast_frac,
         color_dual=args.color_dual,
         decode_serial=args.decode_serial,
+        ref_floor=args.ref_floor,
+        margin=args.margin,
     )

@@ -9,9 +9,9 @@ OUTPUT_DIR = "patterns"
 
 
 class Projector:
-    def __init__(self, display_number=1, pattern_res_pxl=2, delay_ms=200):
+    def __init__(self, display_number=1, square_size=2, delay_ms=200):
         self.delay = delay_ms / 1000
-        self.pattern_res_pxl = pattern_res_pxl or 1
+        self.square_size = square_size or 1
 
         pygame.init()
         monitors = get_monitors()
@@ -19,13 +19,13 @@ class Projector:
 
         # Largest power-of-2 grid that fits the projector
         self.max_power_2 = int(np.floor(np.log2(
-            min(self.proj.width, self.proj.height) / self.pattern_res_pxl
+            min(self.proj.width, self.proj.height) / self.square_size
         )))
         self.grid_dimensions = int(2 ** self.max_power_2)
         self.n_cells = self.grid_dimensions ** 2
 
         # Pixel extent of the square grid
-        self.grid_px = self.grid_dimensions * self.pattern_res_pxl
+        self.grid_px = self.grid_dimensions * self.square_size
 
         # Center the grid on the projector surface
         self.grid_x = (self.proj.width  - self.grid_px) // 2
@@ -46,8 +46,9 @@ class Projector:
             f"Configuration:\n"
             f"  Projector:  {self.proj.width}x{self.proj.height}\n"
             f"  Grid:       {self.grid_dimensions}x{self.grid_dimensions} cells\n"
-            f"  Square:     {self.pattern_res_pxl} px\n"
+            f"  Square:     {self.square_size} px\n"
             f"  Grid area:  {self.grid_px}x{self.grid_px} px "
+            f"centered at ({self.grid_x}, {self.grid_y})"
         )
 
     # ------------------------------------------------------------------ #
@@ -87,9 +88,9 @@ class Projector:
     A = np.array([[0,1,1,0],[1,0,0,1],[1,0,0,1],[0,1,1,0]], dtype=np.uint8)
     B = np.array([[0,0,1,0],[1,1,1,0],[0,1,1,1],[0,1,0,0]], dtype=np.uint8)
 
-    def generate_structured_light(self):
+    def generate_multiscale_masks(self):
         """
-        Core structured light pattern generator.
+        Core multiscale pattern generator.
         tile=True:  fill the grid by tiling the scaled mask
         tile=False: show only the top-left corner, pad remainder with zeros
         """
@@ -125,6 +126,37 @@ class Projector:
         patterns.append(np.ones(g * g, dtype=np.uint8))  # white reference
         return self._store_matrix(np.array(patterns)[::-1])
 
+    # Alias so callers using either name work
+    def generate_structured_light(self):
+        return self.generate_multiscale_masks()
+
+    def generate_structured_light_complementary(self):
+        """Complementary version of the structured-light set.
+
+        Layout (this is what the decoder relies on):
+          row 0            : all-white reference
+          rows 1,2         : code_0,  inverse(code_0)
+          rows 3,4         : code_1,  inverse(code_1)
+          ...
+        Each code bit is decided by comparing a pattern frame against its
+        inverse frame (which is brighter), which is far more robust to
+        glossy/specular surfaces than a single brightness threshold.
+        """
+        # Build the same code rows as the normal generator, minus the white
+        # reference, in the same order.
+        base = self.generate_multiscale_masks()           # stores reversed matrix
+        full = self.pattern_matrix.copy()                 # (white_ref + codes)
+        white = full[0:1]                                 # (1, n_cells)
+        codes = full[1:]                                  # (K, n_cells)
+
+        # Interleave each code with its inverse
+        interleaved = np.empty((codes.shape[0] * 2, codes.shape[1]), dtype=np.uint8)
+        interleaved[0::2] = codes
+        interleaved[1::2] = 1 - codes
+
+        matrix = np.vstack([white, interleaved])          # (1 + 2K, n_cells)
+        return self._store_matrix(matrix)
+
     # ------------------------------------------------------------------ #
     #  Projection                                                        #
     # ------------------------------------------------------------------ #
@@ -153,27 +185,29 @@ class Projector:
         pygame.display.flip()
 
     # ------------------------------------------------------------------ #
-    #  Persistence                                                       #
+    #  Persistence                                                         #
     # ------------------------------------------------------------------ #
 
-    def save_pattern_matrix(self, run_name="default_run", pattern="rasters"):
+    def save_pattern_matrix(self, run_name="default_run", pattern="rasters",
+                            complementary=True):
         pattern_dir = os.path.join(OUTPUT_DIR, run_name, pattern)
         os.makedirs(pattern_dir, exist_ok=True)
         np.save(os.path.join(pattern_dir, "pattern_matrix.npy"), self.pattern_matrix)
         meta = {
             "grid_dimensions": self.grid_dimensions,
             "n_cells":         self.n_cells,
-            "pattern_res_pxl": self.pattern_res_pxl,
+            "square_size":     self.square_size,
             "grid_px":         self.grid_px,
             "grid_x":          self.grid_x,
             "grid_y":          self.grid_y,
             "proj_width":      self.proj.width,
             "proj_height":     self.proj.height,
+            "complementary":   complementary,
         }
         np.save(os.path.join(pattern_dir, "grid_meta.npy"), meta)
 
     # ------------------------------------------------------------------ #
-    #  Lifecycle                                                         #
+    #  Lifecycle                                                           #
     # ------------------------------------------------------------------ #
 
     def quit(self):
