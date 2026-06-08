@@ -30,7 +30,7 @@ def run_session(run_name="test_run", pattern="structured", compliment=True,
     # Set up projector
     projector = Projector(display_number=display_number,
                           pattern_res_pxl=pattern_res_pxl,
-                          compliment=compliment)
+                          inverse=compliment)
 
     if pattern == "raster":
         projector.generate_rasters()
