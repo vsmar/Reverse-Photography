@@ -40,9 +40,28 @@ from reconstruct_metric import load_calibration, triangulate_metric
 SERIALS = ("105322251697", "046322251346")
 
 
+# Projector resolution for this rig (DLP, constant). Update if the projector
+# or its output resolution ever changes.
+PROJ_W, PROJ_H = 1920, 1080
+
 def grid_meta_for(run):
+    """Projector grid geometry for a run. Old captures saved it under
+    patterns/<run>/*/grid_meta.npy; the newer capture front-end only writes
+    captures/<run>/metadata.json, so derive it from there when needed. The grid
+    is centred on the projector (matches projection_control's grid_x/grid_y)."""
     g = glob.glob(os.path.join(_REPO_ROOT, "patterns", run, "*", "grid_meta.npy"))
-    return np.load(g[0], allow_pickle=True).item() if g else None
+    if g:
+        return np.load(g[0], allow_pickle=True).item()
+    meta = os.path.join(_CAPTURES, run, "metadata.json")
+    if os.path.exists(meta):
+        import json
+        m = json.load(open(meta))
+        gd = int(m["grid_dimensions"]); res = int(m["pattern_res_pxl"])
+        gp = gd * res
+        return {"grid_dimensions": gd, "n_cells": gd * gd, "grid_px": gp,
+                "grid_x": (PROJ_W - gp) // 2, "grid_y": (PROJ_H - gp) // 2,
+                "proj_width": PROJ_W, "proj_height": PROJ_H}
+    return None
 
 
 def cell_to_proj_pixel(cells, gm):
@@ -76,7 +95,11 @@ def compact_centroids(code, valid, std_max=10.0, nmin=3):
     return {int(c): (x, y) for c, x, y, k in zip(uniq, cx, cy, keep) if k}
 
 
-def collect_correspondences(run, calib, std_max=10.0, max_reproj=1.5):
+def collect_correspondences(run, calib, std_max=10.0, max_reproj=5.0):
+    # NOTE: max_reproj is looser than the dense pipeline's 1.5 px on purpose --
+    # a projector cell's footprint looks slightly different from each camera, so
+    # its cam1 vs cam2 centroid are not the exact same 3D point. 5 px keeps
+    # thousands of solid pairs; tightening to ~1.5 starves the calibration.
     """One reliable (3D, projector-pixel) pair per trustworthy projector cell."""
     K1, d1, K2, d2, R, T = calib
     d1d = os.path.join(_CAPTURES, run, SERIALS[0])
