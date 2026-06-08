@@ -120,6 +120,8 @@ def run_session(run_name="test_run", pattern="structured", complement=True,
             "settle_ms": settle_ms,
             "delay_ms": delay_ms,
             "flush_frames": flush_frames,
+            "camera_gain": cam.gain,
+            "camera_exposure": cam.exposure,
         },
     }
 

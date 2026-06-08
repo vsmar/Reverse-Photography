@@ -9,6 +9,8 @@
   "capture": {
     "settle_ms": 200,
     "delay_ms": 200,
-    "flush_frames": 2
+    "flush_frames": 2,
+    "camera_gain": 0,
+    "camera_exposure": 200
   }
 }

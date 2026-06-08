@@ -9,7 +9,10 @@ class CameraController:
         self.serials = serials
         self.pipelines = {}
 
-    def setup_cameras(self):
+    def setup_cameras(self, gain=0, exposure=200):
+        self.gain = None
+        self.exposure = None
+
         for serial in self.serials:
             pipeline = rs.pipeline()
             config = rs.config()
@@ -25,9 +28,11 @@ class CameraController:
                     if sensor.supports(rs.option.enable_auto_exposure):     # disable auto-exposure
                         sensor.set_option(rs.option.enable_auto_exposure, 0)
                         if sensor.supports(rs.option.exposure):
-                            sensor.set_option(rs.option.exposure, 200)
+                            sensor.set_option(rs.option.exposure, exposure)
+                            self.exposure = exposure
                     if sensor.supports(rs.option.gain):
-                        sensor.set_option(rs.option.gain, 0)
+                        sensor.set_option(rs.option.gain, gain)
+                        self.gain = gain
 
             self.pipelines[serial] = pipeline
 
