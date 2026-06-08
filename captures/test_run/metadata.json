@@ -1,14 +1,14 @@
 {
   "pattern": "structured",
-  "inverse": true,
-  "grid_dimensions": 256,
-  "n_cells": 65536,
+  "complement": true,
   "pattern_res_pxl": 4,
-  "settle_ms": 200,
-  "delay_ms": 200,
-  "flush_frames": 2,
   "camera_serials": [
     "105322251697",
     "046322251346"
-  ]
+  ],
+  "capture": {
+    "settle_ms": 200,
+    "delay_ms": 200,
+    "flush_frames": 2
+  }
 }

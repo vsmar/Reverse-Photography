@@ -4,9 +4,9 @@ from scipy.linalg import hadamard
 from screeninfo import get_monitors
 
 class Projector:
-    def __init__(self, display_number=1, pattern_res_pxl=2, inverse=True):
+    def __init__(self, display_number=1, pattern_res_pxl=2, complement=True):
         self.pattern_res_pxl = pattern_res_pxl
-        self.inverse = inverse
+        self.complement = complement
         pygame.init()
         monitors = get_monitors()
         self.proj = monitors[display_number] if display_number < len(monitors) else monitors[0]
@@ -29,7 +29,7 @@ class Projector:
 
     def _store_matrix(self, matrix):
         self.num_base_patterns = len(matrix)
-        if self.inverse:
+        if self.complement:
             interleaved = np.empty((2*len(matrix), matrix.shape[1]), dtype=matrix.dtype)
             interleaved[0::2] = matrix
             interleaved[1::2] = 1 - matrix
@@ -92,10 +92,10 @@ if __name__ == '__main__':
     parser.add_argument("--delay", type=int, default=500, help="Interval between projections (ms).")
     parser.add_argument("--pattern", choices=["raster", "hadamard", "structured"], 
                             default="structured", help="Type of pattern to project.")
-    parser.add_argument("--inverse", action="store_true", help="Include inverse patterns.")
+    parser.add_argument("--complement", action="store_true", help="Include complement patterns.")
     args = parser.parse_args()
 
-    p = Projector(inverse=args.inverse, pattern_res_pxl=args.res)
+    p = Projector(complement=args.complement, pattern_res_pxl=args.res)
 
     if args.pattern == "raster":        p.generate_rasters()
     elif args.pattern == "hadamard":    p.generate_hadamard()
