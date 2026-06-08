@@ -80,7 +80,8 @@ def post_process_run(run_dir, serials, complement, n_raw, n_base):
 ###############################################
 def run_session(run_name="test_run", pattern="structured", complement=True,
                 delay_ms=500, settle_ms=100, flush_frames=2,
-                display_number=1, pattern_res_pxl=4, decode=False, color=True):
+                display_number=1, pattern_res_pxl=4, decode=False, color=True,
+                exposure=200):
 
     run_dir = os.path.join(OUTPUT_DIR, run_name)
     os.makedirs(run_dir, exist_ok=True)
@@ -102,7 +103,7 @@ def run_session(run_name="test_run", pattern="structured", complement=True,
 
     # Set up cameras
     cam = CameraController(CAMERA_SERIALS)
-    cam.setup_cameras()
+    cam.setup_cameras(exposure=exposure)
 
     raw_dirs = {}
     for serial in CAMERA_SERIALS:
@@ -170,6 +171,7 @@ if __name__ == '__main__':
     parser.add_argument("--res", type=int, default=4, help="Pattern resolution (px)")
     parser.add_argument("--display", type=int, default=1, help="Monitor index for projector")
     parser.add_argument("--grayscale", action="store_false", help="Decode in grayscale instead of color")
+    parser.add_argument("--exposure", type=int, default=200, help="Camera exposure time (ms)")
     args = parser.parse_args()
 
     run_session(
@@ -183,4 +185,5 @@ if __name__ == '__main__':
         display_number=args.display,
         decode=args.decode,
         color=args.grayscale,
+        exposure=args.exposure,
     )

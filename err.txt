@@ -1,4 +1,0 @@
-  File "/sessions/awesome-nice-maxwell/mnt/Reverse-Photography/reconstruction/self_calibrated.py", line 172
-    "z_max": float(X[:, 2].max(
-                              ^
-SyntaxError: '(' was never closed
