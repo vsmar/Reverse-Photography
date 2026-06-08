@@ -1,0 +1,16 @@
+{
+  "pattern": "structured",
+  "complement": true,
+  "pattern_res_pxl": 4,
+  "camera_serials": [
+    "105322251697",
+    "046322251346"
+  ],
+  "capture": {
+    "settle_ms": 200,
+    "delay_ms": 200,
+    "flush_frames": 2,
+    "camera_gain": 0,
+    "camera_exposure": 200
+  }
+}
