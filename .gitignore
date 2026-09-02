@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+
+# Editor / OS
+.DS_Store
+
+# New capture run output (existing tracked runs under captures/ are unaffected)
+captures/
