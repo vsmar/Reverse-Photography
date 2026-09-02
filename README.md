@@ -35,6 +35,7 @@ archive/             superseded decoder experiments, kept for reference only
 captures/            capture run output (large; see note below)
 camera_test/         ad hoc camera test shots
 visual_aids/         projector_gradient.py and the test pattern it generates
+presentation/        final-presentation slides (see Course project below)
 ```
 
 ## Setup
@@ -77,9 +78,18 @@ See [src/reverse_photography/reconstruction/README.md](src/reverse_photography/r
 
 ## Course project
 
-Final project for University of Washington CSE 576 (Computer Vision).
+Final project for University of Washington CSE 576 (Computer Vision). See the
+[final presentation](presentation/EE%20576%20Final%20Presentation.pdf) for
+background and results.
 
 - **Victor Marcenac** -- capture + decode/fuse pipeline
 - **Tawsif Ahmed** -- capture + decode/fuse pipeline
 - **Bahaa Alattar** -- CNN denoising (not part of this repo)
 - **Gyungmin Ko** -- 3D reconstruction
+
+## References
+
+- Dual Photography: https://dl.acm.org/doi/10.1145/1186822.1073257​
+- Single-Pixel Imaging Survey: https://pmc.ncbi.nlm.nih.gov/articles/PMC5557330/​
+- OkiOptics Demo (Single Pixel): https://youtu.be/dMH6VUs5u8k ​
+- OkiOptics Demo (Multi-View): https://youtu.be/TcXMf0mTh94​
